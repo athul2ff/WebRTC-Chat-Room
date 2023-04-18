@@ -38,7 +38,20 @@ let init = async () => {
 
 let handleMessageFromPeer = async (message, memberId) => {
   message = JSON.parse(message.text);
-  console.log("Message:", message);
+
+  if (message.type === "offer") {
+    createAnswer(memberId, message.offer);
+  }
+
+  if (message.type === "answer") {
+    addAnswer(message.answer);
+  }
+
+  if (message.type === "candidate") {
+    if (peerConnection) {
+      peerConnection.addIceCandidate(message.candidate);
+    }
+  }
 };
 
 let handleUserJoined = async (memberId) => {
@@ -46,10 +59,18 @@ let handleUserJoined = async (memberId) => {
   createOffer(memberId);
 };
 
-let createOffer = async (memberId) => {
+let createPeerConnection = async (memberId) => {
   peerConnection = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
   document.getElementById("user-2").srcObject = remoteStream;
+
+  if (!localStream) {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+    document.getElementById("user-1").srcObject = localStream;
+  }
 
   localStream.getTracks().forEach((track) => {
     peerConnection.addTrack(track, localStream);
@@ -57,7 +78,7 @@ let createOffer = async (memberId) => {
 
   peerConnection.ontrack = (event) => {
     event.streams[0].getTracks().forEach((track) => {
-      remoteStream.addTrack();
+      remoteStream.addTrack(track);
     });
   };
 
@@ -74,7 +95,10 @@ let createOffer = async (memberId) => {
       );
     }
   };
+};
 
+let createOffer = async (memberId) => {
+  await createPeerConnection(memberId);
   let offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
@@ -82,6 +106,26 @@ let createOffer = async (memberId) => {
     { text: JSON.stringify({ type: "offer", offer: offer }) },
     memberId
   );
+};
+
+let createAnswer = async (memberId, offer) => {
+  await createPeerConnection(memberId);
+
+  await peerConnection.setRemoteDescription(offer);
+
+  let answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+
+  client.sendMessageToPeer(
+    { text: JSON.stringify({ type: "answer", answer: answer }) },
+    memberId
+  );
+};
+
+let addAnswer = async (answer) => {
+  if (!peerConnection.currentRemoteDescription) {
+    peerConnection.setRemoteDescription(answer);
+  }
 };
 
 init();
