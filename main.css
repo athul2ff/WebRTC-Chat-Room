@@ -9,3 +9,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 2em;
 }
+
+#user-2 {
+  display: none;
+}
