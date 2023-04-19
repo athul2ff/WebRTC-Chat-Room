@@ -26,6 +26,14 @@ const servers = {
   ],
 };
 
+let constraints = {
+  video: {
+    width: { min: 640, ideal: 1920, max: 1920 },
+    height: { min: 480, ideal: 1080, max: 1080 },
+  },
+  audio: true,
+};
+
 let init = async () => {
   client = await AgoraRTM.createInstance(APP_ID);
   await client.login({ uid, token });
@@ -38,22 +46,20 @@ let init = async () => {
 
   client.on("MessageFromPeer", handleMessageFromPeer);
 
-  localStream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true,
-  });
+  localStream = await navigator.mediaDevices.getUserMedia(constraints);
   document.getElementById("user-1").srcObject = localStream;
 };
 
-let handleUserLeft = async (memberId) => {
+let handleUserLeft = (MemberId) => {
   document.getElementById("user-2").style.display = "none";
+  document.getElementById("user-1").classList.remove("smallFrame");
 };
 
-let handleMessageFromPeer = async (message, memberId) => {
+let handleMessageFromPeer = async (message, MemberId) => {
   message = JSON.parse(message.text);
 
   if (message.type === "offer") {
-    createAnswer(memberId, message.offer);
+    createAnswer(MemberId, message.offer);
   }
 
   if (message.type === "answer") {
@@ -67,16 +73,19 @@ let handleMessageFromPeer = async (message, memberId) => {
   }
 };
 
-let handleUserJoined = async (memberId) => {
-  console.log("A new user joined the channel:", memberId);
-  createOffer(memberId);
+let handleUserJoined = async (MemberId) => {
+  console.log("A new user joined the channel:", MemberId);
+  createOffer(MemberId);
 };
 
-let createPeerConnection = async (memberId) => {
+let createPeerConnection = async (MemberId) => {
   peerConnection = new RTCPeerConnection(servers);
+
   remoteStream = new MediaStream();
   document.getElementById("user-2").srcObject = remoteStream;
   document.getElementById("user-2").style.display = "block";
+
+  document.getElementById("user-1").classList.add("smallFrame");
 
   if (!localStream) {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -105,25 +114,26 @@ let createPeerConnection = async (memberId) => {
             candidate: event.candidate,
           }),
         },
-        memberId
+        MemberId
       );
     }
   };
 };
 
-let createOffer = async (memberId) => {
-  await createPeerConnection(memberId);
-  let offer = await peerConnection.createOffer(memberId);
+let createOffer = async (MemberId) => {
+  await createPeerConnection(MemberId);
+
+  let offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
   client.sendMessageToPeer(
     { text: JSON.stringify({ type: "offer", offer: offer }) },
-    memberId
+    MemberId
   );
 };
 
-let createAnswer = async (memberId, offer) => {
-  await createPeerConnection(memberId);
+let createAnswer = async (MemberId, offer) => {
+  await createPeerConnection(MemberId);
 
   await peerConnection.setRemoteDescription(offer);
 
@@ -132,7 +142,7 @@ let createAnswer = async (memberId, offer) => {
 
   client.sendMessageToPeer(
     { text: JSON.stringify({ type: "answer", answer: answer }) },
-    memberId
+    MemberId
   );
 };
 
@@ -155,11 +165,11 @@ let toggleCamera = async () => {
   if (videoTrack.enabled) {
     videoTrack.enabled = false;
     document.getElementById("camera-btn").style.backgroundColor =
-      "rgb(255,80,80)";
+      "rgb(255, 80, 80)";
   } else {
     videoTrack.enabled = true;
     document.getElementById("camera-btn").style.backgroundColor =
-      "rgb(179,102,249, .9)";
+      "rgb(179, 102, 249, .9)";
   }
 };
 
@@ -168,19 +178,19 @@ let toggleMic = async () => {
     .getTracks()
     .find((track) => track.kind === "audio");
 
-  console.log("hello worrld", audioTrack);
-
   if (audioTrack.enabled) {
     audioTrack.enabled = false;
-    document.getElementById("mic-btn").style.backgroundColor = "rgb(255,80,80)";
+    document.getElementById("mic-btn").style.backgroundColor =
+      "rgb(255, 80, 80)";
   } else {
     audioTrack.enabled = true;
     document.getElementById("mic-btn").style.backgroundColor =
-      "rgb(179,102,249, .9)";
+      "rgb(179, 102, 249, .9)";
   }
 };
 
 window.addEventListener("beforeunload", leaveChannel);
+
 document.getElementById("camera-btn").addEventListener("click", toggleCamera);
 document.getElementById("mic-btn").addEventListener("click", toggleMic);
 
